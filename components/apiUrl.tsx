@@ -1,678 +1,505 @@
+const API_BASE_URL = "https://localhost:7211/"
 import axios from "axios"
 
-// Create axios instance with default configuration
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.sems.com",
-  timeout: 10000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-})
+interface CreateUserDto {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+}
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    try {
-      const token = localStorage.getItem("authToken")
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
-    } catch (error) {
-      console.error("Error accessing localStorage for auth token:", error)
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  },
-)
+interface CreateAdminRequest {
+  createUserDto: CreateUserDto
+}
 
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error("API Error:", error)
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      try {
-        localStorage.removeItem("authToken")
-        localStorage.removeItem("AdminId")
-      } catch (e) {
-        console.error("Error clearing localStorage:", e)
-      }
-    }
-    return Promise.reject(error)
-  },
-)
+interface DataResponse {
+  message: string
+  status: boolean
+  data?: any
+}
 
-// Authentication APIs
-export const loginUser = async (email: string, password: string) => {
+interface AdminData {
+  id: number
+  adminId: string
+  firstName: string
+  lastName: string
+  userName: string
+  email: string
+  phoneNumber: string
+  pictureUrl: string
+}
+
+interface CustomerData {
+  id: number
+  customerId: string
+  firstName: string
+  lastName: string
+  userName: string
+  email: string
+  phoneNumber: string
+  pictureUrl: string
+  meterData: MeterData[]
+}
+interface MeterData {
+  id: number
+  customerName: string
+  meterId: string
+  meterKey: string
+  connectionAuth: string
+  totalUnits: number
+  consumedUnits: number
+  baseLoad: number
+  isActive: boolean
+  activeLoad: boolean
+}
+
+interface MeterUnitAllocationData {
+  id: number
+  meterId: number
+  allocatedUnits: number
+  consumedUnits: number
+  baseLoad: number
+  peakLoad: number
+  offPeakLoad: number
+  getTransactionDto: {
+    date: string
+    time: string
+    transactionId: string
+    rate: number
+    baseCharge: number
+    taxes: number
+    total: number
+  }
+  unitAllocationStatus: number
+}
+interface GetPricesResponse {
+  data: {
+    id: number
+    itemName: string
+    rate: number
+    taxes: number
+    baseCharge: number
+  }
+  message: string
+  status: boolean
+}
+
+interface LoginResponse {
+  data: {
+    id: number
+    firstName: string | null
+    lastName: string | null
+    email: string
+    userName: string
+    roleName: string
+  }
+  token: string | null
+  message: string
+  status: boolean
+}
+interface ForgotPasswordResponse {
+  username: string
+  id: number
+  message: string
+  status: boolean
+}
+interface AdminResponse {
+  data: {
+    id: number
+    adminId: string
+    firstName: string
+    lastName: string
+    userName: string
+    email: string
+    phoneNumber: string
+    pictureUrl: string
+  }
+  message: string
+  status: boolean
+}
+interface CustomerResponse {
+  data: {
+    id: number
+    customerId: string
+    firstName: string
+    lastName: string
+    userName: string
+    email: string
+    phoneNumber: string
+    pictureUrl: string
+  }
+  message: string
+  status: boolean
+}
+interface PriceUpdateDto {
+  id: number
+  itemName: string
+  rate: number
+  taxes: number
+  baseCharge: number
+}
+interface MeterPromptResponse {
+  id: number
+  meterId: number
+  title: string
+  description: string
+  date: string
+  type: number
+  IsDismissed: boolean
+}
+
+export const createAdmin = async (data: CreateAdminRequest): Promise<DataResponse> => {
   try {
-    const response = await api.post("/auth/login", { email, password })
-    return {
-      status: true,
-      data: response.data,
-      message: "Login successful",
-    }
+    const response = await axios.post<DataResponse>(`${API_BASE_URL}SEMS/Admin/CreateAdmin`, data, {
+      headers: { "Content-Type": "application/json" },
+    })
+    return response.data
   } catch (error) {
-    console.error("Login API error:", error)
-    // Mock response for demo
-    if (email === "admin@sems.com" && password === "Admin123!") {
-      return {
-        status: true,
-        data: {
-          id: "1",
-          email: "admin@sems.com",
-          roleName: "Admin",
-          firstName: "John",
-          lastName: "Doe",
-        },
-        message: "Login successful",
-      }
-    }
-    return {
-      status: false,
-      data: null,
-      message: "Invalid credentials",
-    }
+    console.error("Error creating admin:", error)
+    throw new Error("Failed to create admin")
   }
 }
 
-export const logoutUser = async () => {
+export const getAdminById = async (id: number): Promise<AdminResponse> => {
   try {
-    await api.post("/auth/logout")
-    return { status: true, message: "Logout successful" }
+    const response = await axios.get<AdminResponse>(`${API_BASE_URL}SEMS/Admin/GetAdminById${id}`, {
+      headers: { Accept: "*/*" },
+    })
+    return response.data
   } catch (error) {
-    console.error("Logout API error:", error)
-    return { status: true, message: "Logout successful" }
+    console.error("Error fetching admin by id:", error)
+    throw new Error("Failed to fetch admin data")
   }
 }
 
-// Administrator APIs
-export const getAdministrators = async (page = 1, limit = 10) => {
+export const getAllAdmins = async (): Promise<AdminResponse[]> => {
   try {
-    const response = await api.get(`/administrators?page=${page}&limit=${limit}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Administrators fetched successfully",
-    }
+    const response = await axios.get<AdminResponse[]>(`${API_BASE_URL}SEMS/Admin/GetAllAdmins`)
+    return response.data
   } catch (error) {
-    console.error("Get administrators API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        administrators: [
-          {
-            id: "1",
-            firstName: "John",
-            lastName: "Doe",
-            email: "john.doe@sems.com",
-            role: "System Administrator",
-            department: "IT",
-            status: "Active",
-            createdAt: "2024-01-15T10:30:00Z",
-          },
-          {
-            id: "2",
-            firstName: "Jane",
-            lastName: "Smith",
-            email: "jane.smith@sems.com",
-            role: "Operations Manager",
-            department: "Operations",
-            status: "Active",
-            createdAt: "2024-01-10T14:20:00Z",
-          },
-        ],
-        total: 2,
-        page: 1,
-        totalPages: 1,
-      },
-      message: "Administrators fetched successfully",
-    }
+    console.error("Error fetching all admins:", error)
+    throw new Error("Failed to fetch all admins")
   }
 }
 
-export const getAdministratorById = async (id: string) => {
+export const deleteAdmin = async (id: number): Promise<DataResponse> => {
   try {
-    const response = await api.get(`/administrators/${id}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Administrator fetched successfully",
-    }
+    const response = await axios.delete<DataResponse>(`${API_BASE_URL}SEMS/Admin/DeleteAdmin${id}`)
+    return response.data
   } catch (error) {
-    console.error("Get administrator by ID API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        id: id,
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@sems.com",
-        phone: "+1234567890",
-        address: "123 Main Street",
-        city: "New York",
-        state: "NY",
-        zipCode: "10001",
-        role: "System Administrator",
-        department: "IT",
-        bio: "System Administrator with 5+ years of experience in energy management systems.",
-        status: "Active",
-        avatar: "/placeholder-user.jpg",
-        createdAt: "2024-01-15T10:30:00Z",
-      },
-      message: "Administrator fetched successfully",
-    }
+    console.error("Error deleting admin:", error)
+    throw new Error("Failed to delete admin")
   }
 }
 
-export const createAdministrator = async (adminData: any) => {
-  try {
-    const response = await api.post("/administrators", adminData)
-    return {
-      status: true,
-      data: response.data,
-      message: "Administrator created successfully",
-    }
-  } catch (error) {
-    console.error("Create administrator API error:", error)
-    // Mock success response
-    return {
-      status: true,
-      data: { id: Date.now().toString(), ...adminData },
-      message: "Administrator created successfully",
-    }
+export const updateAdmin = async (data: AdminData): Promise<DataResponse> => {
+  try{
+    const response = await axios.put<DataResponse>(`${API_BASE_URL}SEMS/Admin/UpdateAdmin`, data)
+    return response.data
+  }  catch (error) {
+    console.error("Error updating admin:", error)
+    throw new Error("Failed to update admin")
   }
 }
 
-export const updateAdministrator = async (id: string, adminData: any) => {
+export const createCustomer = async (data: CreateAdminRequest): Promise<DataResponse> => {
   try {
-    const response = await api.put(`/administrators/${id}`, adminData)
-    return {
-      status: true,
-      data: response.data,
-      message: "Administrator updated successfully",
-    }
+    const response = await axios.post<DataResponse>(`${API_BASE_URL}SEMS/Customer/CreateCustomer`, data, {
+      headers: { "Content-Type": "application/json" },
+    })
+    return response.data
   } catch (error) {
-    console.error("Update administrator API error:", error)
-    // Mock success response
-    return {
-      status: true,
-      data: { id, ...adminData },
-      message: "Administrator updated successfully",
-    }
+    console.error("Error creating customer:", error)
+    throw new Error("Failed to create customer")
   }
 }
 
-export const deleteAdministrator = async (id: string) => {
+export const updateCustomer = async (data: CustomerData): Promise<DataResponse> => {
   try {
-    await api.delete(`/administrators/${id}`)
-    return {
-      status: true,
-      message: "Administrator deleted successfully",
-    }
+    const response = await axios.put<DataResponse>(`${API_BASE_URL}SEMS/Customer/UpdateCustomer`, data)
+    return response.data
   } catch (error) {
-    console.error("Delete administrator API error:", error)
-    return {
-      status: true,
-      message: "Administrator deleted successfully",
-    }
+    console.error("Error updating customer:", error)
+    throw new Error("Failed to update customer")
   }
 }
 
-export const checkUsernameAvailability = async (username: string) => {
+export const getCustomerById = async (id: number): Promise<CustomerResponse> => {
   try {
-    const response = await api.get(`/administrators/check-username/${username}`)
-    return {
-      status: true,
-      available: response.data.available,
-      message: response.data.message,
-    }
+    const response = await axios.get<CustomerResponse>(`${API_BASE_URL}SEMS/Customer/GetCustomerById${id}`, {
+      headers: { Accept: "*/*" },
+    })
+    return response.data
   } catch (error) {
-    console.error("Check username API error:", error)
-    // Mock response - simulate availability check
-    const unavailableUsernames = ["admin", "administrator", "root", "user", "test"]
-    return {
-      status: true,
-      available: !unavailableUsernames.includes(username.toLowerCase()),
-      message: unavailableUsernames.includes(username.toLowerCase())
-        ? "Username is already taken"
-        : "Username is available",
-    }
+    console.error("Error fetching customer by id:", error)
+    throw new Error("Failed to fetch customer data")
   }
 }
 
-// Customer APIs
-export const getCustomers = async (page = 1, limit = 10) => {
+export const getAllCustomers = async (): Promise<CustomerResponse[]> => {
   try {
-    const response = await api.get(`/customers?page=${page}&limit=${limit}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Customers fetched successfully",
-    }
+    const response = await axios.get<CustomerResponse[]>(`${API_BASE_URL}SEMS/Customer/GetAllCustomers`, {
+      headers: { Accept: "*/*" },
+    })
+    return response.data
   } catch (error) {
-    console.error("Get customers API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        customers: [
-          {
-            id: "1",
-            firstName: "Alice",
-            lastName: "Johnson",
-            email: "alice.johnson@email.com",
-            phone: "+1234567890",
-            address: "456 Oak Street",
-            city: "Boston",
-            state: "MA",
-            zipCode: "02101",
-            status: "Active",
-            accountBalance: 125.5,
-            lastPayment: "2024-01-20T10:00:00Z",
-            createdAt: "2024-01-01T08:00:00Z",
-          },
-          {
-            id: "2",
-            firstName: "Bob",
-            lastName: "Wilson",
-            email: "bob.wilson@email.com",
-            phone: "+1234567891",
-            address: "789 Pine Avenue",
-            city: "Chicago",
-            state: "IL",
-            zipCode: "60601",
-            status: "Active",
-            accountBalance: 89.25,
-            lastPayment: "2024-01-18T15:30:00Z",
-            createdAt: "2023-12-15T12:00:00Z",
-          },
-        ],
-        total: 2,
-        page: 1,
-        totalPages: 1,
-      },
-      message: "Customers fetched successfully",
-    }
+    console.error("Error fetching all customers:", error)
+    throw new Error("Failed to fetch all customers")
   }
 }
 
-export const getCustomerById = async (id: string) => {
+export const createMeter = async (adminUserId: number, isActive: boolean): Promise<DataResponse> => {
   try {
-    const response = await api.get(`/customers/${id}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Customer fetched successfully",
-    }
+    const response = await axios.post<DataResponse>(
+      `${API_BASE_URL}SEMS/Meter/CreateMeter`,
+      { adminUserId, isActive },
+      { headers: { "Content-Type": "application/json" } },
+    )
+    return response.data
   } catch (error) {
-    console.error("Get customer by ID API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        id: id,
-        firstName: "Alice",
-        lastName: "Johnson",
-        email: "alice.johnson@email.com",
-        phone: "+1234567890",
-        address: "456 Oak Street",
-        city: "Boston",
-        state: "MA",
-        zipCode: "02101",
-        status: "Active",
-        accountBalance: 125.5,
-        lastPayment: "2024-01-20T10:00:00Z",
-        createdAt: "2024-01-01T08:00:00Z",
-      },
-      message: "Customer fetched successfully",
-    }
+    console.error("Error creating meter:", error)
+    throw new Error("Failed to create meter")
   }
 }
 
-// Meter APIs
-export const getMeters = async (page = 1, limit = 10) => {
+export const attachMeterToCustomer = async (
+  meterId: string,
+  meterKey: string,
+  userId: number,
+): Promise<DataResponse> => {
   try {
-    const response = await api.get(`/meters?page=${page}&limit=${limit}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Meters fetched successfully",
+    if (!meterId || !meterKey || !userId) {
+      throw new Error("Meter ID, Meter Key, and User ID are required.")
     }
+
+    const response = await axios.post<DataResponse>(
+      `${API_BASE_URL}SEMS/Meter/AttachMeterToCustomer`,
+      { meterId, meterKey, userId },
+      { headers: { Accept: "*/*", "Content-Type": "application/json" } },
+    )
+
+    return response.data
   } catch (error) {
-    console.error("Get meters API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        meters: [
-          {
-            id: "1",
-            serialNumber: "MTR001",
-            customerId: "1",
-            customerName: "Alice Johnson",
-            location: "456 Oak Street, Boston, MA",
-            status: "Active",
-            lastReading: 1250.5,
-            lastReadingDate: "2024-01-20T10:00:00Z",
-            installationDate: "2024-01-01T08:00:00Z",
-          },
-          {
-            id: "2",
-            serialNumber: "MTR002",
-            customerId: "2",
-            customerName: "Bob Wilson",
-            location: "789 Pine Avenue, Chicago, IL",
-            status: "Active",
-            lastReading: 890.25,
-            lastReadingDate: "2024-01-19T14:30:00Z",
-            installationDate: "2023-12-15T12:00:00Z",
-          },
-        ],
-        total: 2,
-        page: 1,
-        totalPages: 1,
-      },
-      message: "Meters fetched successfully",
-    }
+    console.error("Error attaching meter to customer:", error)
+    throw new Error("Failed to attach meter to customer")
   }
 }
 
-export const getMeterById = async (id: string) => {
+export const updateMeter = async (data: any): Promise<DataResponse> => {
   try {
-    const response = await api.get(`/meters/${id}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Meter fetched successfully",
-    }
+    const response = await axios.put<DataResponse>(`${API_BASE_URL}SEMS/Meter/UpdateMeter`, data)
+    return response.data
   } catch (error) {
-    console.error("Get meter by ID API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        id: id,
-        serialNumber: "MTR001",
-        customerId: "1",
-        customerName: "Alice Johnson",
-        location: "456 Oak Street, Boston, MA",
-        status: "Active",
-        lastReading: 1250.5,
-        lastReadingDate: "2024-01-20T10:00:00Z",
-        installationDate: "2024-01-01T08:00:00Z",
-        readings: [
-          { date: "2024-01-20", consumption: 45.2, cost: 12.5, voltage: 240 },
-          { date: "2024-01-19", consumption: 42.8, cost: 11.85, voltage: 238 },
-          { date: "2024-01-18", consumption: 48.1, cost: 13.3, voltage: 242 },
-        ],
-      },
-      message: "Meter fetched successfully",
-    }
+    console.error("Error updating meter:", error)
+    throw new Error("Failed to update meter")
   }
 }
 
-export const createMeter = async (meterData: any) => {
+export const getAllMeters = async (): Promise<MeterData[]> => {
   try {
-    const response = await api.post("/meters", meterData)
-    return {
-      status: true,
-      data: response.data,
-      message: "Meter created successfully",
-    }
+    const response = await axios.get<MeterData[]>(`${API_BASE_URL}SEMS/Meter/GetAllMeters`)
+    return response.data
   } catch (error) {
-    console.error("Create meter API error:", error)
-    // Mock success response
-    return {
-      status: true,
-      data: { id: Date.now().toString(), ...meterData },
-      message: "Meter created successfully",
-    }
+    console.error("Error fetching all meters:", error)
+    throw new Error("Failed to fetch all meters")
   }
 }
 
-// Transaction APIs
-export const getTransactions = async (page = 1, limit = 10) => {
+export const updateMeterPrompts = async (meterId: number): Promise<DataResponse> => {
   try {
-    const response = await api.get(`/transactions?page=${page}&limit=${limit}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Transactions fetched successfully",
-    }
+    const response = await axios.put<DataResponse>(`${API_BASE_URL}SEMS/MeterPrompt/UpdateMeterPrompts${meterId}`)
+    return response.data
   } catch (error) {
-    console.error("Get transactions API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        transactions: [
-          {
-            id: "1",
-            customerId: "1",
-            customerName: "Alice Johnson",
-            amount: 125.5,
-            type: "Payment",
-            status: "Completed",
-            date: "2024-01-20T10:00:00Z",
-            description: "Monthly electricity bill payment",
-          },
-          {
-            id: "2",
-            customerId: "2",
-            customerName: "Bob Wilson",
-            amount: 89.25,
-            type: "Payment",
-            status: "Completed",
-            date: "2024-01-18T15:30:00Z",
-            description: "Monthly electricity bill payment",
-          },
-        ],
-        total: 2,
-        page: 1,
-        totalPages: 1,
-      },
-      message: "Transactions fetched successfully",
-    }
+    console.error("Error updating meter prompts:", error)
+    throw new Error("Failed to update meter prompts")
   }
 }
 
-export const getTransactionById = async (id: string) => {
+export const getMeterPrompts = async (meterId: number): Promise<MeterPromptResponse[]> => {
   try {
-    const response = await api.get(`/transactions/${id}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Transaction fetched successfully",
-    }
+    const response = await axios.put<MeterPromptResponse[]>(`${API_BASE_URL}SEMS/MeterPrompt/GetMeterPrompts${meterId}`)
+    return response.data
   } catch (error) {
-    console.error("Get transaction by ID API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        id: id,
-        customerId: "1",
-        customerName: "Alice Johnson",
-        amount: 125.5,
-        type: "Payment",
-        status: "Completed",
-        date: "2024-01-20T10:00:00Z",
-        description: "Monthly electricity bill payment",
-        paymentMethod: "Credit Card",
-        transactionFee: 2.5,
-      },
-      message: "Transaction fetched successfully",
-    }
+    console.error("Error updating meter prompts:", error)
+    throw new Error("Failed to update meter prompts")
+  }
+}
+export const getMeterUnitsData = async (id: number): Promise<DataResponse> => {
+  try {
+    const response = await axios.get<DataResponse>(`${API_BASE_URL}SEMS/Data/MeterUnitsData?Meterid=${id}`)
+    return response.data
+  } catch (error) {
+    console.error("Error creating meter unit allocation:", error)
+    throw new Error("Failed to create meter unit allocation")
+  }
+}
+export const getDashBoardData = async (): Promise<any> => {
+  try {
+    const response = await axios.get<any>(`${API_BASE_URL}SEMS/Data/GetDashBoardData`)
+    return response
+  } catch (error) {
+    console.error("Error getting DashBoard Data:", error)
+    throw new Error("Failed to get dashboard data")
+  }
+}
+export const getDashBoardTransactionData = async (): Promise<any> => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}SEMS/Data/GetDashBoardTransactionData`)
+    return response.data
+  } catch (error) {
+    console.error("Error getting Get DashBoard Transaction Data:", error)
+    throw new Error("Failed to get get dashBoard transaction data")
+  }
+}
+// Add the new function for getting all meter units
+export const getAllMeterUnits = async (): Promise<DataResponse> => {
+  try {
+    const response = await axios.get<DataResponse>(`${API_BASE_URL}SEMS/Meter/GetAllMeterUnits`)
+    return response.data
+  } catch (error) {
+    console.error("Error fetching meter units:", error)
+    throw new Error("Failed to fetch meter units")
   }
 }
 
-// Energy Usage APIs
-export const getEnergyUsage = async (timeframe = "7d") => {
+export const createMeterUnitAllocation = async (id: number, amount: number): Promise<DataResponse> => {
   try {
-    const response = await api.get(`/energy-usage?timeframe=${timeframe}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Energy usage data fetched successfully",
-    }
+    const response = await axios.post<DataResponse>(
+      `${API_BASE_URL}SEMS/MeterUnitAllocation/CreateMeterUnitAllocation?id=${id}&amount=${amount}`,
+    )
+    return response.data
   } catch (error) {
-    console.error("Get energy usage API error:", error)
-    // Mock data for demo
-    const mockData = {
-      "7d": [
-        { date: "2024-01-14", consumption: 1250, cost: 187.5 },
-        { date: "2024-01-15", consumption: 1180, cost: 177.0 },
-        { date: "2024-01-16", consumption: 1320, cost: 198.0 },
-        { date: "2024-01-17", consumption: 1290, cost: 193.5 },
-        { date: "2024-01-18", consumption: 1150, cost: 172.5 },
-        { date: "2024-01-19", consumption: 1380, cost: 207.0 },
-        { date: "2024-01-20", consumption: 1420, cost: 213.0 },
-      ],
-      "30d": Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        consumption: Math.floor(Math.random() * 500) + 1000,
-        cost: Math.floor(Math.random() * 75) + 150,
-      })),
-      "90d": Array.from({ length: 90 }, (_, i) => ({
-        date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        consumption: Math.floor(Math.random() * 500) + 1000,
-        cost: Math.floor(Math.random() * 75) + 150,
-      })),
-    }
-
-    return {
-      status: true,
-      data: mockData[timeframe as keyof typeof mockData] || mockData["7d"],
-      message: "Energy usage data fetched successfully",
-    }
+    console.error("Error creating meter unit allocation:", error)
+    throw new Error("Failed to create meter unit allocation")
   }
 }
 
-// Price APIs
-export const getPrices = async () => {
+export const getMeterUnitAllocationById = async (meterId: number): Promise<MeterUnitAllocationData[]> => {
   try {
-    const response = await api.get("/prices")
-    return {
-      status: true,
-      data: response.data,
-      message: "Prices fetched successfully",
-    }
+    const response = await axios.get<MeterUnitAllocationData[]>(
+      `${API_BASE_URL}SEMS/MeterUnitAllocation/GetMeterUnitAllocationById?meterId=${meterId}`,
+      { headers: { Accept: "*/*" } },
+    )
+    return response.data
   } catch (error) {
-    console.error("Get prices API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        prices: [
-          {
-            id: "1",
-            name: "Residential Rate",
-            rate: 0.15,
-            unit: "kWh",
-            effectiveDate: "2024-01-01T00:00:00Z",
-            status: "Active",
-          },
-          {
-            id: "2",
-            name: "Commercial Rate",
-            rate: 0.12,
-            unit: "kWh",
-            effectiveDate: "2024-01-01T00:00:00Z",
-            status: "Active",
-          },
-        ],
-      },
-      message: "Prices fetched successfully",
-    }
+    console.error("Error fetching meter unit allocation by id:", error)
+    throw new Error("Failed to fetch meter unit allocation")
   }
 }
 
-export const updatePrice = async (id: string, priceData: any) => {
+export const getAllMeterUnitsAllocation = async (): Promise<MeterUnitAllocationData[]> => {
   try {
-    const response = await api.put(`/prices/${id}`, priceData)
-    return {
-      status: true,
-      data: response.data,
-      message: "Price updated successfully",
-    }
+    const response = await axios.get<MeterUnitAllocationData[]>(
+      `${API_BASE_URL}SEMS/MeterUnitAllocation/GetAllMeterUnitsAllocation`,
+      { headers: { Accept: "*/*" } },
+    )
+    return response.data
   } catch (error) {
-    console.error("Update price API error:", error)
-    // Mock success response
-    return {
-      status: true,
-      data: { id, ...priceData },
-      message: "Price updated successfully",
-    }
+    console.error("Error fetching meter unit allocation by id:", error)
+    throw new Error("Failed to fetch meter unit allocation")
   }
 }
 
-// Dashboard Stats APIs
-export const getDashboardStats = async () => {
+export const updatePrices = async (data: PriceUpdateDto): Promise<DataResponse> => {
   try {
-    const response = await api.get("/dashboard/stats")
-    return {
-      status: true,
-      data: response.data,
-      message: "Dashboard stats fetched successfully",
-    }
+    const response = await axios.put<DataResponse>(`${API_BASE_URL}SEMS/Prices/UpdatePrices`, data, {
+      headers: { "Content-Type": "application/json" },
+    })
+    return response.data
   } catch (error) {
-    console.error("Get dashboard stats API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        totalCustomers: 1250,
-        totalMeters: 1180,
-        activeMeters: 1150,
-        totalRevenue: 125000,
-        monthlyGrowth: 8.5,
-        energyConsumed: 45000,
-        averageBill: 89.5,
-      },
-      message: "Dashboard stats fetched successfully",
-    }
+    console.error("Error updating prices:", error)
+    throw new Error("Failed to update prices")
   }
 }
 
-// Reports APIs
-export const getReportsData = async (timeframe = "30d") => {
+export const getPrices = async (): Promise<GetPricesResponse[]> => {
   try {
-    const response = await api.get(`/reports?timeframe=${timeframe}`)
-    return {
-      status: true,
-      data: response.data,
-      message: "Reports data fetched successfully",
-    }
+    const response = await axios.get<GetPricesResponse[]>(`${API_BASE_URL}SEMS/Prices/GetPrices`)
+    return response.data
   } catch (error) {
-    console.error("Get reports data API error:", error)
-    // Mock data for demo
-    return {
-      status: true,
-      data: {
-        transactions: [
-          { month: "Jan", amount: 125000, count: 1250 },
-          { month: "Feb", amount: 135000, count: 1350 },
-          { month: "Mar", amount: 142000, count: 1420 },
-        ],
-        meters: [
-          { status: "Active", count: 1150 },
-          { status: "Inactive", count: 30 },
-          { status: "Maintenance", count: 20 },
-        ],
-        customers: [
-          { month: "Jan", new: 45, total: 1205 },
-          { month: "Feb", new: 38, total: 1243 },
-          { month: "Mar", new: 52, total: 1295 },
-        ],
-      },
-      message: "Reports data fetched successfully",
-    }
+    console.error("Error fetching prices:", error)
+    throw new Error("Failed to fetch prices")
   }
 }
 
-export default api
+export const checkUserName = async (username: string): Promise<boolean> => {
+  try {
+    const response = await axios.get<boolean>(`${API_BASE_URL}SEMS/User/CheckUserName?username=${username}`)
+    return response.data
+  } catch (error) {
+    console.error("Error checking username:", error)
+    throw new Error("Failed to check username")
+  }
+}
+
+export const loginUser = async (username: string, password: string): Promise<LoginResponse> => {
+  try {
+    const response = await axios.post<LoginResponse>(
+      `${API_BASE_URL}SEMS/User/Login?username=${username}&password=${password}`,
+    )
+    return response.data
+  } catch (error) {
+    console.error("Error logging in user:", error)
+    throw new Error("Failed to log in user")
+  }
+}
+
+export const forgotPassword = async (email: string): Promise<ForgotPasswordResponse> => {
+  try {
+    const response = await axios.post<ForgotPasswordResponse>(
+      `${API_BASE_URL}SEMS/User/ForgotPassword?email=${encodeURIComponent(email)}`,
+      null,
+      { headers: { Accept: "*/*" } },
+    )
+    return response.data
+  } catch (error) {
+    console.error("Error sending password reset email:", error)
+    throw new Error("Failed to send password reset email")
+  }
+}
+
+export const changePassword = async (id: number, username: string, password: string): Promise<DataResponse> => {
+  try {
+    const response = await axios.put<DataResponse>(
+      `${API_BASE_URL}SEMS/User/ChangePassword?id=${id}&username=${username}&password=${password}`,
+      { headers: { Accept: "*/*" } },
+    )
+    return response.data
+  } catch (error) {
+    console.error("Error changing password:", error)
+    throw new Error("Failed to change password")
+  }
+}
+
+const apiMethods = {
+  createAdmin,
+  getAdminById,
+  getAllAdmins,
+  deleteAdmin,
+  updateAdmin,
+  createCustomer,
+  updateCustomer,
+  getCustomerById,
+  getAllCustomers,
+  createMeter,
+  updateMeter,
+  attachMeterToCustomer,
+  getAllMeters,
+  updateMeterPrompts,
+  getMeterPrompts,
+  getMeterUnitsData,
+  getDashBoardData,
+  getDashBoardTransactionData,
+  getAllMeterUnits,
+  createMeterUnitAllocation,
+  getMeterUnitAllocationById,
+  getAllMeterUnitsAllocation,
+  updatePrices,
+  getPrices,
+  checkUserName,
+  loginUser,
+  forgotPassword,
+  changePassword,
+}
+
+export default apiMethods
