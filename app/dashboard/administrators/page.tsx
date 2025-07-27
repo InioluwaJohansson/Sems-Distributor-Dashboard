@@ -118,6 +118,9 @@ export default function AdministratorsPage() {
         setFilteredAdmins(data.data)
       } catch (error) {
         console.error("Error fetching administrators:", error)
+        // Fallback to mock data
+        setAdmins(administratorsData.data)
+        setFilteredAdmins(administratorsData.data)
       } finally {
         setIsLoading(false)
       }
@@ -178,13 +181,16 @@ export default function AdministratorsPage() {
     setIsLoading(true)
     try {
       // In a real app, this would fetch fresh data from the API
-      const data = await apiMethods.getAllAdmins()
+      const data = await api.getAllAdmins()
 
       setAdmins(data.data)
       setFilteredAdmins(data.data)
       setSearchQuery("")
     } catch (error) {
       console.error("Error refreshing administrators:", error)
+      // Fallback to mock data
+      setAdmins(administratorsData.data)
+      setFilteredAdmins(administratorsData.data)
     } finally {
       setIsLoading(false)
     }

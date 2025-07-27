@@ -14,7 +14,7 @@ import * as z from "zod"
 import { Input } from "@/components/ui/input"
 import { User2, Camera, Loader2, Check, X, ArrowLeft, Save } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import * as api from "@/components/apiUrl"
 import { debounce } from "lodash"
 
@@ -119,8 +119,8 @@ export default function EditProfilePage() {
       try {
         // In a real app, this would fetch data from an API
         // Simulate API call
-        const adminId = localstorage.getItem("AdminId")
-        const adminProfile  = api.getAdminById(parseInt(adminId))
+        const adminId = localStorage.getItem("AdminId")
+        const adminProfile = await api.getAdminById(Number.parseInt(adminId || "1"))
         await new Promise((resolve) => setTimeout(resolve, 500))
 
         // Use the mock data
@@ -149,7 +149,7 @@ export default function EditProfilePage() {
     }
 
     fetchProfile()
-  }, [])
+  }, [updateForm, toast])
 
   const onUpdateSubmit = async (values: z.infer<typeof updateProfileSchema>) => {
     setIsLoading(true)
@@ -157,20 +157,20 @@ export default function EditProfilePage() {
       // In a real app, this would send the data to an API
       console.log("Update form submitted:", values)
       const updateAdmin = {
-        "id": parseInt(localstorage.getItem("AdminId")),
-        "firstName": values.firstName,
-        "lastName": values.lastName,
-        "userName": values.userName,
-        "email": values.email,
-        "phoneNumber": values.phoneNumber,
-        "pictureUrl": values.picture || "",
+        id: Number.parseInt(localStorage.getItem("AdminId") || "1"),
+        firstName: values.firstName,
+        lastName: values.lastName,
+        userName: values.userName,
+        email: values.email,
+        phoneNumber: values.phoneNumber,
+        pictureUrl: values.picture || "",
       }
-      
-      const response = api.updateAdmin(updateAdmin)
+
+      const response = await api.updateAdmin(updateAdmin)
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      if(response.status == true){
+      if (response.status === true) {
         setProfile({
           ...profile,
           firstName: values.firstName,
@@ -267,7 +267,7 @@ export default function EditProfilePage() {
     return () => {
       debouncedCheckUsername.cancel()
     }
-  }, [username, profile.userName])
+  }, [username, profile.userName, debouncedCheckUsername])
 
   return (
     <div className="space-y-6 w-full">
