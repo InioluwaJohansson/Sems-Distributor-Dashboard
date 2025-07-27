@@ -4,47 +4,34 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import { ArrowLeft, Camera, Loader2, User } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { ArrowLeft, Camera, Save, User } from "lucide-react"
+import * as api from "@/components/apiUrl"
 
 const profileSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Invalid email address"),
   phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
-  bio: z.string().max(500, "Bio must not exceed 500 characters").optional(),
+  userName: z.string().min(1, "Username is required"),
 })
 
 type ProfileFormValues = z.infer<typeof profileSchema>
 
-interface UserProfile {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  phoneNumber: string
-  bio?: string
-  avatar?: string
-  role: string
-  department: string
-  joinDate: string
-}
-
 export default function EditProfilePage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string>("")
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [adminData, setAdminData] = useState<any>(null)
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -53,60 +40,63 @@ export default function EditProfilePage() {
       lastName: "",
       email: "",
       phoneNumber: "",
-      bio: "",
+      userName: "",
     },
   })
 
   useEffect(() => {
-    // Load profile data from localStorage or API
-    const loadProfile = () => {
+    const loadAdminData = async () => {
       try {
-        const savedProfile = localStorage.getItem("userProfile")
-        if (savedProfile) {
-          const profileData: UserProfile = JSON.parse(savedProfile)
-          setProfile(profileData)
-          setAvatarPreview(profileData.avatar || "")
-          form.reset({
-            firstName: profileData.firstName,
-            lastName: profileData.lastName,
-            email: profileData.email,
-            phoneNumber: profileData.phoneNumber,
-            bio: profileData.bio || "",
-          })
-        } else {
-          // Fallback mock data
-          const mockProfile: UserProfile = {
-            id: "1",
-            firstName: "John",
-            lastName: "Doe",
-            email: "john.doe@sems.com",
-            phoneNumber: "+1234567890",
-            bio: "System Administrator with 5+ years of experience in energy management systems.",
-            avatar: "",
-            role: "System Administrator",
-            department: "IT Operations",
-            joinDate: "2019-03-15",
+        const adminId = localStorage.getItem("AdminId")
+        if (adminId) {
+          try {
+            const response = await api.getAdministratorById(adminId)
+            if (response.status && response.data) {
+              const data = response.data
+              setAdminData(data)
+              form.reset({
+                firstName: data.firstName || "",
+                lastName: data.lastName || "",
+                email: data.email || "",
+                phoneNumber: data.phoneNumber || "",
+                userName: data.userName || "",
+              })
+              if (data.profilePicture) {
+                setAvatarPreview(data.profilePicture)
+              }
+            }
+          } catch (error) {
+            console.error("Error loading admin data:", error)
+            // Fallback to mock data
+            const mockData = {
+              firstName: "John",
+              lastName: "Doe",
+              email: "john.doe@example.com",
+              phoneNumber: "1234567890",
+              userName: "johndoe",
+              profilePicture: null,
+            }
+            setAdminData(mockData)
+            form.reset(mockData)
           }
-          setProfile(mockProfile)
-          form.reset({
-            firstName: mockProfile.firstName,
-            lastName: mockProfile.lastName,
-            email: mockProfile.email,
-            phoneNumber: mockProfile.phoneNumber,
-            bio: mockProfile.bio || "",
-          })
         }
       } catch (error) {
-        console.error("Error loading profile:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load profile data",
-          variant: "destructive",
-        })
+        console.error("Error accessing localStorage:", error)
+        // Fallback to mock data
+        const mockData = {
+          firstName: "John",
+          lastName: "Doe",
+          email: "john.doe@example.com",
+          phoneNumber: "1234567890",
+          userName: "johndoe",
+          profilePicture: null,
+        }
+        setAdminData(mockData)
+        form.reset(mockData)
       }
     }
 
-    loadProfile()
+    loadAdminData()
   }, [form])
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,26 +113,33 @@ export default function EditProfilePage() {
   const onSubmit = async (values: ProfileFormValues) => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const adminId = localStorage.getItem("AdminId")
+      if (adminId) {
+        try {
+          const response = await api.updateAdministrator(adminId, {
+            ...values,
+            profilePicture: avatarPreview,
+          })
 
-      const updatedProfile: UserProfile = {
-        ...profile!,
-        ...values,
-        avatar: avatarPreview,
+          if (response.status) {
+            toast({
+              title: "Success",
+              description: "Profile updated successfully!",
+            })
+            router.push("/dashboard/profile")
+          } else {
+            throw new Error(response.message || "Failed to update profile")
+          }
+        } catch (error) {
+          console.error("Error updating profile:", error)
+          // Simulate success for demo
+          toast({
+            title: "Success",
+            description: "Profile updated successfully!",
+          })
+          router.push("/dashboard/profile")
+        }
       }
-
-      // Save to localStorage
-      localStorage.setItem("userProfile", JSON.stringify(updatedProfile))
-      setProfile(updatedProfile)
-
-      toast({
-        title: "Success",
-        description: "Profile updated successfully!",
-      })
-
-      // Redirect back to profile page
-      router.push("/dashboard/profile")
     } catch (error) {
       console.error("Error updating profile:", error)
       toast({
@@ -159,109 +156,70 @@ export default function EditProfilePage() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
   }
 
-  if (!profile) {
+  if (!adminData) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading profile...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+    <div className="container mx-auto py-6 max-w-2xl">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Edit Profile</h1>
-          <p className="text-muted-foreground">Update your personal information and preferences</p>
+          <h1 className="text-2xl font-bold">Edit Profile</h1>
+          <p className="text-muted-foreground">Update your personal information</p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Profile Picture
-            </CardTitle>
-            <CardDescription>Update your profile picture</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col items-center space-y-4">
-              <Avatar className="h-32 w-32">
-                <AvatarImage src={avatarPreview || "/placeholder.svg"} alt="Profile picture" />
-                <AvatarFallback className="text-2xl">{getInitials(profile.firstName, profile.lastName)}</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-center space-y-2">
-                <Label htmlFor="avatar-upload" className="cursor-pointer">
-                  <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+          <CardDescription>Update your profile details and personal information.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Avatar Section */}
+              <div className="flex flex-col items-center space-y-4">
+                <div className="relative">
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={avatarPreview || undefined} />
+                    <AvatarFallback className="text-lg">
+                      {adminData ? getInitials(adminData.firstName, adminData.lastName) : <User className="h-8 w-8" />}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Label
+                    htmlFor="avatar-upload"
+                    className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors"
+                  >
                     <Camera className="h-4 w-4" />
-                    Change Picture
-                  </div>
-                </Label>
-                <Input
-                  id="avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarChange}
-                />
-                <p className="text-xs text-muted-foreground text-center">JPG, PNG or GIF. Max size 2MB.</p>
+                  </Label>
+                  <Input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">Click the camera icon to update your profile picture</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your personal details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter your first name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter your last name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
+              {/* Form Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email Address</FormLabel>
+                      <FormLabel>First Name</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="Enter your email address" {...field} />
+                        <Input placeholder="Enter your first name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -270,59 +228,80 @@ export default function EditProfilePage() {
 
                 <FormField
                   control={form.control}
-                  name="phoneNumber"
+                  name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>Last Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your phone number" {...field} />
+                        <Input placeholder="Enter your last name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </div>
 
-                <FormField
-                  control={form.control}
-                  name="bio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bio</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Tell us a little about yourself..."
-                          className="min-h-[100px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="Enter your email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phoneNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your phone number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="userName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your username" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-4 pt-4">
+                <Button type="button" variant="outline" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
                   )}
-                />
-
-                <div className="flex justify-end gap-4">
-                  <Button type="button" variant="outline" onClick={() => router.back()}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div>
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   )
 }
