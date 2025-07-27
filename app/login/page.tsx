@@ -2,39 +2,27 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Lock, User, AlertCircle } from "lucide-react"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-
+import axios from "axios"
+import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import * as api from "@/components/apiUrl"
-
-const passwordSchema = z
-  .string()
-  .min(8, "Password must be at least 8 characters")
-  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-  .regex(/[0-9]|[^a-zA-Z0-9]/, "Password must contain at least one number or special character")
+import { apiUrl } from "@/components/apiUrl"
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: passwordSchema,
+  email: z.string().email({ message: "Invalid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 })
 
-type LoginFormValues = z.infer<typeof loginSchema>
-
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [loginError, setLoginError] = useState("")
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Initialize form
-  const form = useForm<LoginFormValues>({
+  const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -42,79 +30,81 @@ export default function LoginPage() {
     },
   })
 
-  const handleLogin = async (values: LoginFormValues) => {
+  async function onSubmit(values: z.infer<typeof loginSchema>) {
     setIsLoading(true)
-    setLoginError("")
-
     try {
-      // In a real app, this would validate credentials with the API
+      const response = await axios.post(`${apiUrl}/admins/login`, {
+        email: values.email,
+        password: values.password,
+      })
 
-      try {
-        // Uncomment this in a real app
-        const response = await api.loginUser(values.email, values.password)
-        if (response.status && response.data.roleName === "Admin") {
-          localStorage.setItem("AdminId", response.data.id)
-          router.push("/dashboard")
-        } else {
-          setLoginError("Invalid Email/Username or password. Please try again.")
+      if (response.data.success) {
+        try {
+          localStorage.setItem("AdminId", response.data.adminId)
+        } catch (localStorageError) {
+          console.error("Error setting localStorage item:", localStorageError)
+          toast({
+            title: "Error",
+            description: "Failed to save login session. Please try again.",
+            variant: "destructive",
+          })
+          return
         }
-      } catch (error) {
-        console.error("Login error:", error)
-        setLoginError("An error occurred during login. Please try again.")
+        toast({
+          title: "Login Successful",
+          description: "Redirecting to dashboard...",
+        })
+        router.push("/dashboard")
+      } else {
+        toast({
+          title: "Login Failed",
+          description: response.data.message || "Invalid credentials.",
+          variant: "destructive",
+        })
       }
-
-      // Simulate login - in a real app, you would validate credentials
-      await new Promise((resolve) => setTimeout(resolve, 1500))
     } catch (error) {
-      console.error("Login error:", error)
-      setLoginError("An error occurred during login. Please try again.")
+      console.error("Login API error:", error)
+      if (axios.isAxiosError(error)) {
+        toast({
+          title: "Login Error",
+          description: error.response?.data?.message || "An unexpected error occurred during login.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Login Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        })
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-muted/40">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-900">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">SEMS Admin Login</CardTitle>
-          <CardDescription>Enter your credentials to access the Smart Electric Metering System</CardDescription>
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">Login</CardTitle>
+          <CardDescription>Enter your email and password to access the dashboard.</CardDescription>
         </CardHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleLogin)}>
-            <CardContent className="grid gap-4">
-              {loginError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{loginError}</AlertDescription>
-                </Alert>
-              )}
-
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email or Username</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Enter Email address or Username"
-                          type="email"
-                          autoCapitalize="none"
-                          autoComplete="email"
-                          autoCorrect="off"
-                          className="pl-10"
-                          {...field}
-                        />
-                      </div>
+                      <Input id="email" type="email" placeholder="m@example.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="password"
@@ -122,41 +112,18 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          className="pl-10 pr-10"
-                          {...field}
-                          placeholder="**********"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-10 w-10 text-muted-foreground"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                        </Button>
-                      </div>
+                      <Input id="password" type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Password must be at least 8 characters with a capital letter and a number or special character
-                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" type="submit" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign in"}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Logging in..." : "Login"}
               </Button>
-            </CardFooter>
-          </form>
-        </Form>
+            </form>
+          </Form>
+        </CardContent>
       </Card>
     </div>
   )

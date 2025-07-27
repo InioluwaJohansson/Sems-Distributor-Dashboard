@@ -66,7 +66,7 @@
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "latest",
-    "zod": "5.1.0"
+    "zod": "4.1.0-canary.20250709T185023"
   },
   "devDependencies": {
     "@types/lodash": "4.17.13",
