@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://localhost:7211/"
+const API_BASE_URL = "https://semsmeter-bkbjcvczebf5g4ge.westeurope-01.azurewebsites.net/"
 import axios from "axios"
 
 interface CreateUserDto {
